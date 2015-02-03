@@ -9,6 +9,8 @@ module.exports.init = function(app, opcoes) {
 };
 
 function getTasks(req, res, next) {
+    // TODO: Move database logic into repository
+
     var Task = req.models.Task,
         User = req.models.User,
         findAll = Task.findAll({
@@ -39,6 +41,8 @@ function getTasks(req, res, next) {
 }
 
 function getTaskById(req, res, next) {
+    // TODO: Move database logic into repository
+
     var Task = req.models.Task,
         User = req.models.User,
         Comment = req.models.Comment,

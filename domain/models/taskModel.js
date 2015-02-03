@@ -18,6 +18,12 @@ module.exports = function(sequelize, DataTypes, options) {
             type: DataTypes.TEXT,
             allowNull: false
         },
+
+        isOpen: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: true
+        }
     },{
         freezeTableName: true,
         tableName: 'tasks',
