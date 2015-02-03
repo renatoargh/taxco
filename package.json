@@ -1,0 +1,36 @@
+{
+  "name": "taxco",
+  "version": "1.0.0",
+  "description": "Very simple task management api",
+  "main": "index.js",
+  "scripts": {
+    "test": "exit 0;"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/renatoargh/taxco.git"
+  },
+  "keywords": [
+    "task",
+    "management"
+  ],
+  "author": "Renato Gama <renato@gammasoft.com.br>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/renatoargh/taxco/issues"
+  },
+  "homepage": "https://github.com/renatoargh/taxco",
+  "dependencies": {
+    "async": "^0.9.0",
+    "bcrypt": "^0.8.1",
+    "body-parser": "^1.11.0",
+    "express": "^4.11.2",
+    "glob": "^4.3.5",
+    "method-override": "^2.3.1",
+    "moment": "^2.9.0",
+    "morgan": "^1.5.1",
+    "mysql": "^2.5.4",
+    "sequelize": "^2.0.0-rc8",
+    "underscore": "^1.7.0"
+  }
+}
