@@ -21,6 +21,7 @@ function getTasks(req, res, next) {
                 'id',
                 'title',
                 'description',
+                'isOpen',
                 'createdAt',
                 'updatedAt'
             ],
