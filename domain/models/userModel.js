@@ -9,15 +9,15 @@ module.exports = function(sequelize, DataTypes, options) {
             primaryKey: true
         },
 
-        username: {
-            type: DataTypes.STRING(50),
-            allowNull: false,
-            unique: true
-        },
-
         name: {
             type: DataTypes.STRING(75),
             allowNull: false
+        },
+
+        email: {
+            type: DataTypes.STRING(50),
+            allowNull: false,
+            unique: true
         },
 
         password: {

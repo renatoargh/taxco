@@ -19,7 +19,8 @@ var express = require('express'),
     PORT = process.env.PORT || 9090,
     NODE_ENV = process.env.NODE_ENV,
     isProduction = NODE_ENV === 'production',
-    env = require('./env.json');
+    env = require('./env.json'),
+    userRepository;
 
 // Shorthands (prevent require hell)
 global._repository = global._repository = function(repository) {
@@ -53,6 +54,8 @@ Object.keys(models).forEach(function(modelName) {
         models[modelName].associate(models);
     }
 });
+
+userRepository = _repository('user')(models);
 
 function dropDatabase(callback) {
     var dropAllTables = [
