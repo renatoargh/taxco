@@ -24,6 +24,12 @@ module.exports = function(sequelize, DataTypes, options) {
             type: DataTypes.STRING(255),
             allowNull: false
         },
+
+        enabled: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false
+        },
     },{
         freezeTableName: true,
         tableName: 'users'

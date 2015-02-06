@@ -1,5 +1,10 @@
 'use strict';
 
+// Shorthands (prevent require hell)
+global._repository = global._repository = function(repository) {
+    return require(path.join(__dirname, '/domain/repositories/', repository + 'Repository.js'));
+}
+
 // Third party dependecies
 var express = require('express'),
     morgan = require('morgan'),
@@ -20,12 +25,8 @@ var express = require('express'),
     NODE_ENV = process.env.NODE_ENV,
     isProduction = NODE_ENV === 'production',
     env = require('./env.json'),
+    UserRepository = _repository('user'),
     userRepository;
-
-// Shorthands (prevent require hell)
-global._repository = global._repository = function(repository) {
-    return require(path.join(__dirname, '/domain/repositories/', repository + 'Repository.js'));
-}
 
 // Database initialization
 var sequelize = new Sequelize(env.mysql.database, env.mysql.user, env.mysql.password, {
@@ -55,7 +56,7 @@ Object.keys(models).forEach(function(modelName) {
     }
 });
 
-userRepository = _repository('user')(models);
+userRepository = new UserRepository(models);
 
 function dropDatabase(callback) {
     var dropAllTables = [
@@ -99,6 +100,8 @@ if(!isProduction) {
     app.use(morgan('dev'));
 }
 
+app.enable('trust proxy');
+
 app.use(function(req, res, next) {
     // CORS Middleware
     res.header('Access-Control-Allow-Origin', '*');
@@ -129,14 +132,17 @@ app.use(function(req, res, next) {
     }
 
     var credentials = req.headers.authorization.replace('Basic ', '');
-    credentials = new Buffer(credentials, 'base64').toString('ascii'); //TODO: Pegar do gammautils
-    credentials = credentials.split(':');
+    credentials = new Buffer(credentials, 'base64').toString('ascii');
+    credentials = credentials.trim().split(':');
     credentials = {
-        username: credentials[0],
+        email: credentials[0],
         password: credentials[1]
     };
 
-    userRepository.findByUsername(credentials.username, function(err, user) {
+    userRepository.find({
+        email: credentials.email,
+        enabled: true
+    }, function(err, user) {
         if(err) {
             return next(err);
         }
@@ -145,7 +151,7 @@ app.use(function(req, res, next) {
             return next(new Error('Wrong username or password'));
         }
 
-        bcrypt.compare(password, user.password, function(err, match) {
+        bcrypt.compare(credentials.password, user.password, function(err, match) {
             if(err) {
                 return done(err);
             }
@@ -178,7 +184,7 @@ app.use(function(req, res, next) {
 
 // Initializing controllers
 glob.sync(__dirname + '/controllers/**/*Controller.js').forEach(function(controllerPath) {
-    require(controllerPath).init(app);
+    require(controllerPath).init(app, models);
 });
 
 app.use(function(req, res){

@@ -5,6 +5,7 @@ var router = require('express').Router();
 module.exports.init = function(app, opcoes) {
     router.get('/', getTasks);
     router.get('/:id', getTaskById);
+
     app.use('/tasks', router);
 };
 

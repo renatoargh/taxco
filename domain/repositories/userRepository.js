@@ -1,15 +1,30 @@
+'use strict';
+
 var User;
 
 module.exports = function(models) {
     User = models.User;
 
-    this.findByUsername = findByUsername;
+    this.create = create;
+    this.find = find;
 };
 
-function findByUsername(username, callback) {
+function create(user, options, callback) {
+    if(typeof options === 'function') {
+        callback = options;
+        options = {};
+    }
+
+    User.create(user).complete(callback);
+}
+
+function find(where, options, callback) {
+    if(typeof options === 'function') {
+        callback = options;
+        options = {};
+    }
+
     User.find({
-        where: {
-            username: username
-        }
+        where: where
     }).complete(callback);
 }
