@@ -7,6 +7,7 @@ module.exports = function(models) {
 
     this.create = create;
     this.find = find;
+    this.findAll = findAll;
 };
 
 function create(user, options, callback) {
@@ -26,5 +27,17 @@ function find(where, options, callback) {
 
     User.find({
         where: where
+    }).complete(callback);
+}
+
+function findAll(where, options, callback) {
+    if(typeof options === 'function') {
+        callback = options;
+        options = {};
+    }
+
+    User.findAll({
+        where: where,
+        attributes: ['id', 'name', 'email', 'role', 'enabled', 'lastInteraction']
     }).complete(callback);
 }

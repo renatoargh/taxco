@@ -13,6 +13,7 @@ module.exports.init = function(app, models) {
 
     router.post('/', postUser);
     router.get('/me', getMe);
+    router.get('/', getUsers);
 
     app.use('/users', router);
 };
@@ -48,4 +49,14 @@ function getMe(req, res, next) {
     } else {
         return next();
     }
+}
+
+function getUsers(req, res, next) {
+    userRepository.findAll({}, function(err, users) {
+        if(err) {
+            return next(err);
+        }
+
+        res.json(users);
+    });
 }

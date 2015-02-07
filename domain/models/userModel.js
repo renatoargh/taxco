@@ -20,6 +20,12 @@ module.exports = function(sequelize, DataTypes, options) {
             unique: true
         },
 
+        role: {
+            type: DataTypes.ENUM('admin', 'user'),
+            allowNull: false,
+            defaultValue: 'user'
+        },
+
         password: {
             type: DataTypes.STRING(255),
             allowNull: false
@@ -30,6 +36,11 @@ module.exports = function(sequelize, DataTypes, options) {
             allowNull: false,
             defaultValue: false
         },
+
+        lastInteraction: {
+            type: DataTypes.DATE,
+            allowNull: true
+        }
     },{
         freezeTableName: true,
         tableName: 'users'
