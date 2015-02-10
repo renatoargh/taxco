@@ -43,7 +43,16 @@ module.exports = function(sequelize, DataTypes, options) {
         }
     },{
         freezeTableName: true,
-        tableName: 'users'
+        tableName: 'users',
+        classMethods: {
+            associate: function(models) {
+                User.belongsToMany(models.Task, {
+                    as: 'visibleTo',
+                    foreignKey: 'userId',
+                    through: models.Visibility
+                });
+            }
+        }
     });
 
     return User;

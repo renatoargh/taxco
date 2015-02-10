@@ -40,6 +40,9 @@ var sequelize = new Sequelize(env.mysql.database, env.mysql.user, env.mysql.pass
         },
         dialectOptions: {
             multipleStatements: !isProduction
+        },
+        pool: {
+            maxConnections: 10
         }
     }),
     modelsFolder = path.join(__dirname, '/domain/models'),
@@ -157,7 +160,11 @@ app.use(function(req, res, next) {
             }
 
             if(match) {
-                req.user = user;
+                user.update({
+                    lastInteraction: Date.now()
+                });
+
+                req.user = user.toJSON();
                 return next();
             }
 
@@ -175,8 +182,13 @@ app.use(methodOverride());
 app.use(function(req, res, next) {
     res.removeHeader('x-powered-by');
 
+    req.sequelize = sequelize;
     req.models = models;
     req.fullUrl = req.protocol + '://' + req.hostname;
+    if(NODE_ENV === 'development') {
+        req.fullUrl += ':' + PORT;
+    }
+
     req.fullPath = req.fullUrl + req.url.split('?')[0];
 
     next();

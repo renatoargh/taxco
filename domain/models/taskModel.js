@@ -33,6 +33,16 @@ module.exports = function(sequelize, DataTypes, options) {
                     as: 'comments'
                 });
 
+                Task.belongsToMany(models.User, {
+                    as: 'visibleTo',
+                    foreignKey: 'taskId',
+                    through: models.Visibility
+                });
+
+                Task.belongsTo(models.User, {
+                    as: 'assignedTo'
+                });
+
                 Task.belongsTo(models.User, {
                     as: 'owner'
                 });

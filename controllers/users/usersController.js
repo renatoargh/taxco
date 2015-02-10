@@ -12,6 +12,7 @@ module.exports.init = function(app, models) {
     userRepository = new UserReposiroty(models);
 
     router.post('/', postUser);
+    router.put('/:id', putUser);
     router.get('/me', getMe);
     router.get('/', getUsers);
 
@@ -41,6 +42,28 @@ function postUser(req, res, next) {
     });
 }
 
+function putUser(req, res, next) {
+    var user = req.body;
+
+    delete user.password;
+    delete user.lastInteraction;
+    user.enabled = user.enabled === 'true';
+
+    userRepository.update(user, {
+        id: user.id
+    }, function(err, recordsChanged) {
+        if(err) {
+            return next(err);
+        }
+
+        if(!recordsChanged) {
+            return next();
+        }
+
+        res.json({});
+    });
+}
+
 function getMe(req, res, next) {
     var user = req.user;
 
@@ -52,7 +75,13 @@ function getMe(req, res, next) {
 }
 
 function getUsers(req, res, next) {
-    userRepository.findAll({}, function(err, users) {
+    var query = req.query;
+
+    if(query.enabled) {
+        query.enabled = query.enabled === 'true';
+    }
+
+    userRepository.findAll(query, function(err, users) {
         if(err) {
             return next(err);
         }
