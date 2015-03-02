@@ -1,14 +1,25 @@
 'use strict';
 
-var router = require('express').Router();
+var router = require('express').Router(),
+    auth = require('../../middlewares/authenticationMiddleware'),
+    transaction = require('../../middlewares/transactionMiddleware'),
+    sequelize;
 
 module.exports.init = function(app, opcoes) {
-    router.post('/', postTask);
-    router.get('/', getTasks);
-    router.get('/:id', getTaskById);
+    router.post('/', auth('admin'), transaction, postTask);
+    // router.post('/:id/comment', auth([ 'admin', 'user' ]), transaction, putComment);
+
+    router.get('/', auth(['admin', 'user']), getTasks);
+    router.get('/:id', auth(['admin', 'user']), getTaskById);
+
+    router.put('/:id', auth(['admin']), putTask);
 
     app.use('/tasks', router);
 };
+
+function putTask(req, res, next) {
+    res.json({});
+}
 
 function postTask(req, res, next) {
     var Task = req.models.Task,
@@ -17,10 +28,17 @@ function postTask(req, res, next) {
         currentUser = req.user,
         visibleTo = task.visibleToId;
 
+    task.isPublic = visibleTo.indexOf('ALL') > -1;
+    if(task.isPublic) {
+        visibleTo = [];
+    }
+
     task.ownerId = currentUser.id;
     task.assignedToId = task.assignedToId ? parseInt(task.assignedToId, 10) : null;
 
-    Task.create(task).complete(function(err, _task) {
+    Task.create(task, {
+        transaction: req.transaction
+    }).complete(function(err, _task) {
         if(err) {
             return next(err);
         }
@@ -36,53 +54,36 @@ function postTask(req, res, next) {
             }
         });
 
-        var bulkCreate = Visibility.bulkCreate(visibleTo);
+        var bulkCreate = Visibility.bulkCreate(visibleTo, {
+            transaction: req.transaction
+        });
 
         bulkCreate.complete(function(err) {
             if(err) {
                 return next(err);
             }
 
-
+            req.transaction.commit();
             res.json(_task);
         });
     });
 }
 
 function getTasks(req, res, next) {
-    var Task = req.models.Task,
-        User = req.models.User,
-        Visibility = req.models.Visibility,
-        currentUser = req.user,
-        findAll = Task.findAll({
-            where: [
-                'assignedToId=? OR ownerId=?',
-                currentUser.id,
-                currentUser.id,
-            ],
-            order: [
-                [ 'createdAt', 'desc' ]
-            ],
-            attributes: [
-                'id',
-                'title',
-                'description',
-                'isOpen',
-                'createdAt',
-                'updatedAt'
-            ],
-            include: [{
-                model: User,
-                as: 'owner',
-                attributes: [ 'name' ]
-            }]
+    var currentUser = req.user,
+        query = req.sequelize.query([
+            'SELECT DISTINCT tasks.*, `owner`.`name` as `owner.name` FROM tasks',
+            'LEFT JOIN visibility as `visibility` ON visibility.taskId = tasks.id',
+            'INNER JOIN users as `owner` ON `owner`.id = tasks.ownerId',
+            'WHERE tasks.ownerId = :userId OR tasks.assignedToId = :userId OR visibility.userId = :userId OR tasks.isPublic = 1',
+            'ORDER BY tasks.createdAt DESC'
+        ].join(' '), null, {
+            raw: true
+        }, {
+            userId: currentUser.id
         });
 
-// SELECT DISTINCT tasks.* FROM tasks
-// LEFT JOIN visibility ON visibility.userId = 2
-// WHERE tasks.ownerId = 2 OR tasks.assignedToId = 2 OR (visibility.userId = 2 AND tasks.ownerId <> 2 AND tasks.assignedToId <> 2)
-
-    findAll.complete(function(err, tasks) {
+    query.complete(function(err, tasks) {
         if(err) {
             return next(err);
         }

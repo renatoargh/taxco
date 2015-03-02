@@ -19,6 +19,12 @@ module.exports = function(sequelize, DataTypes, options) {
             allowNull: false
         },
 
+        isPublic: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false
+        },
+
         isOpen: {
             type: DataTypes.BOOLEAN,
             allowNull: false,

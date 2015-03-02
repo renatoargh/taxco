@@ -4,6 +4,7 @@ var _ = require('underscore'),
     async = require('async'),
     bcrypt = require('bcrypt'),
     router = require('express').Router(),
+    auth = require('../../middlewares/authenticationMiddleware'),
     UserReposiroty = _repository('user'),
     userRepository,
     userPrivateAttributes = ['password'];
@@ -12,9 +13,9 @@ module.exports.init = function(app, models) {
     userRepository = new UserReposiroty(models);
 
     router.post('/', postUser);
-    router.put('/:id', putUser);
+    router.put('/:id', auth('admin'), putUser);
     router.get('/me', getMe);
-    router.get('/', getUsers);
+    router.get('/', auth('admin'), getUsers);
 
     app.use('/users', router);
 };
