@@ -22,7 +22,7 @@ module.exports.init = function(app, models) {
 
 function postUser(req, res, next) {
     var user = req.body,
-        salt = _.partial(bcrypt.genSalt, 12),
+        salt = _.partial(bcrypt.genSalt, 2), // TODO: Trocar para 12 quando o mecanismo de login estiver similar ao GammaERP
         hash = _.partial(bcrypt.hash, user.password);
 
     async.waterfall([salt, hash], function(err, password) {
