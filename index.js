@@ -161,7 +161,8 @@ app.use(function(req, res, next) {
 
             if(match) {
                 user.update({
-                    lastInteraction: Date.now()
+                    lastInteraction: Date.now(),
+                    numberOfInteractions: sequelize.literal('numberOfInteractions + 1')
                 });
 
                 req.user = user.toJSON();

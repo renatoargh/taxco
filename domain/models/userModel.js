@@ -40,6 +40,11 @@ module.exports = function(sequelize, DataTypes, options) {
         lastInteraction: {
             type: DataTypes.DATE,
             allowNull: true
+        },
+
+        numberOfInteractions: {
+            type: DataTypes.INTEGER,
+            defaultValue: 0
         }
     },{
         freezeTableName: true,

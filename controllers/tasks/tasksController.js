@@ -12,13 +12,72 @@ module.exports.init = function(app, opcoes) {
     router.get('/', auth(['admin', 'user']), getTasks);
     router.get('/:id', auth(['admin', 'user']), getTaskById);
 
-    router.put('/:id', auth(['admin']), putTask);
+    router.put('/:id', auth(['admin']), transaction, putTask);
 
     app.use('/tasks', router);
 };
 
 function putTask(req, res, next) {
-    res.json({});
+    var Task = req.models.Task,
+        Visibility = req.models.Visibility,
+        task = req.body,
+        taskId = req.params.id,
+        currentUser = req.user,
+        visibleTo = task.visibleToId || [];
+
+    console.log(JSON.stringify(task, null, 4));
+
+    task.isPublic = visibleTo.indexOf('ALL') > -1;
+    if(task.isPublic) {
+        visibleTo = [];
+    }
+
+    task.assignedToId = task.assignedToId ? parseInt(task.assignedToId, 10) : null;
+
+    Task.update(task, {
+        where: {
+            id: taskId,
+            ownerId: currentUser.id
+        },
+        transaction: req.transaction
+    }).complete(function(err, rows) {
+        if(err) {
+            return next(err);
+        }
+
+        Visibility.destroy({
+            where: {
+                taskId: taskId
+            },
+            transaction: req.transaction
+        }).complete(function(err) {
+            if(err) {
+                return next(err);
+            }
+
+            visibleTo = visibleTo.map(Number).filter(function(userId) {
+                return userId !== task.ownerId && userId !== task.assignedToId;
+            }).map(function(userId) {
+                return {
+                    userId: userId,
+                    taskId: taskId
+                }
+            });
+
+            var bulkCreate = Visibility.bulkCreate(visibleTo, {
+                transaction: req.transaction
+            });
+
+            bulkCreate.complete(function(err) {
+                if(err) {
+                    return next(err);
+                }
+
+                req.transaction.commit();
+                res.json({});
+            });
+        });
+    });
 }
 
 function postTask(req, res, next) {
@@ -26,11 +85,19 @@ function postTask(req, res, next) {
         Visibility = req.models.Visibility,
         task = req.body,
         currentUser = req.user,
-        visibleTo = task.visibleToId;
+        visibleTo = task.visibleToId || [];
 
     task.isPublic = visibleTo.indexOf('ALL') > -1;
     if(task.isPublic) {
         visibleTo = [];
+    }
+
+    if(typeof task.isOpen === 'undefined') {
+        task.isOpen = true;
+    } else {
+        if(typeof task.isOpen === 'string') {
+            task.isOpen = task.isOpen === 'true';
+        }
     }
 
     task.ownerId = currentUser.id;
@@ -78,7 +145,8 @@ function getTasks(req, res, next) {
             'WHERE tasks.ownerId = :userId OR tasks.assignedToId = :userId OR visibility.userId = :userId OR tasks.isPublic = 1',
             'ORDER BY tasks.createdAt DESC'
         ].join(' '), null, {
-            raw: true
+            raw: true,
+            nest: true
         }, {
             userId: currentUser.id
         });
@@ -97,6 +165,7 @@ function getTaskById(req, res, next) {
 
     var Task = req.models.Task,
         User = req.models.User,
+        Visibility = req.models.Visibility,
         Comment = req.models.Comment,
         id = req.params.id,
         find = Task.find({
@@ -107,10 +176,22 @@ function getTaskById(req, res, next) {
                 'id',
                 'title',
                 'description',
+                'isPublic',
+                'isOpen',
                 'createdAt',
                 'updatedAt'
             ],
             include: [{
+                model: User,
+                as: 'visibleTo',
+                attributes: [
+                    'id',
+                    'name',
+                    'role',
+                    'enabled',
+                    'email'
+                ]
+            }, {
                 model: User,
                 as: 'owner',
                 attributes: ['name']
