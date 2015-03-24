@@ -202,7 +202,7 @@ glob.sync(__dirname + '/controllers/**/*Controller.js').forEach(function(control
 
 app.use(function(req, res){
     res.status(404).json({
-        message: 'Resource Not FOund'
+        message: 'Resource Not Found'
     });
 });
 

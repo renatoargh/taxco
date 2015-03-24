@@ -6,16 +6,65 @@ var router = require('express').Router(),
     sequelize;
 
 module.exports.init = function(app, opcoes) {
-    router.post('/', auth('admin'), transaction, postTask);
-    // router.post('/:id/comment', auth([ 'admin', 'user' ]), transaction, putComment);
-
     router.get('/', auth(['admin', 'user']), getTasks);
     router.get('/:id', auth(['admin', 'user']), getTaskById);
-
+    router.post('/', auth('admin'), transaction, postTask);
     router.put('/:id', auth(['admin']), transaction, putTask);
+    router.delete('/:id', auth(['admin']), transaction, deleteTask);
 
     app.use('/tasks', router);
 };
+
+function deleteTask(req, res, next) {
+    var Task = req.models.Task,
+        Comment = req.models.Comment,
+        Visibility = req.models.Visibility,
+        taskId = req.params.id,
+        transaction = req.transaction;
+
+    // TODO: async!
+    var destroyComments = Comment.destroy({
+        where: {
+            TaskId: taskId
+        },
+        transaction: transaction
+    });
+
+    destroyComments.complete(function(err) {
+        if(err) {
+            return next(err);
+        }
+
+        var destroyVisibility = Visibility.destroy({
+            where: {
+                taskId: taskId
+            },
+            transaction: transaction
+        });
+
+        destroyVisibility.complete(function(err) {
+            if(err) {
+                return next(err);
+            }
+
+            var destroyTask = Task.destroy({
+                where: {
+                    id: taskId
+                },
+                transaction: transaction
+            });
+
+            destroyTask.complete(function(err) {
+                if(err) {
+                    return next(err);
+                }
+
+                transaction.commit();
+                res.json({});
+            });
+        });
+    });
+}
 
 function putTask(req, res, next) {
     var Task = req.models.Task,
@@ -24,8 +73,6 @@ function putTask(req, res, next) {
         taskId = req.params.id,
         currentUser = req.user,
         visibleTo = task.visibleToId || [];
-
-    console.log(JSON.stringify(task, null, 4));
 
     task.isPublic = visibleTo.indexOf('ALL') > -1;
     if(task.isPublic) {
@@ -139,9 +186,15 @@ function postTask(req, res, next) {
 function getTasks(req, res, next) {
     var currentUser = req.user,
         query = req.sequelize.query([
-            'SELECT DISTINCT tasks.*, `owner`.`name` as `owner.name` FROM tasks',
+            'SELECT DISTINCT tasks.*, ',
+            '`owner`.`name` as `owner.name`, ',
+            '`owner`.`id` as `owner.id`, ',
+            '`assignedTo`.`name` as `assignedTo.name`, ',
+            '`assignedTo`.`id` as `assignedTo.id` ',
+            'FROM tasks',
             'LEFT JOIN visibility as `visibility` ON visibility.taskId = tasks.id',
             'INNER JOIN users as `owner` ON `owner`.id = tasks.ownerId',
+            'LEFT JOIN users as `assignedTo` ON `assignedTo`.id = tasks.assignedToId',
             'WHERE tasks.ownerId = :userId OR tasks.assignedToId = :userId OR visibility.userId = :userId OR tasks.isPublic = 1',
             'ORDER BY tasks.createdAt DESC'
         ].join(' '), null, {
