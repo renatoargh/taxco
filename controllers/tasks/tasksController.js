@@ -10,16 +10,69 @@ var gammautils = require('gammautils'),
 module.exports.init = function(app, opcoes) {
     router.get('/', auth(['admin', 'user']), getTasks);
     router.get('/:id', auth(['admin', 'user']), getTaskById);
+    router.get('/:id/comments', transaction, getCommentsByTaskId);
 
     router.post('/', auth('admin'), transaction, postTask);
 
     router.put('/:id', auth(['admin']), transaction, putTask);
     router.put('/:id/notify', auth(['admin']), transaction, putNotifyTask);
+    router.put('/:id/comments', transaction, putComment);
 
     router.delete('/:id', auth(['admin']), transaction, deleteTask);
 
     app.use('/tasks', router);
 };
+
+function getCommentsByTaskId(req, res, next) {
+    var User = req.models.User,
+        Comment = req.models.Comment;
+
+    var findAll = Comment.findAll({
+        where: {
+            TaskId: req.params.id
+        },
+        include: [{
+            model: User,
+            as: 'owner',
+            attributes: [
+                'name',
+                'email'
+            ]
+        }]
+    });
+
+    findAll.complete(function(err, comments) {
+        if(err) {
+            return next(err);
+        }
+
+        comments = comments.map(function(comment) {
+            comment = comment.toJSON ? comment.toJSON() : comment;
+            comment.owner.emailMd5 = gammautils.crypto.md5(comment.owner.email);
+            return comment;
+        });
+
+        res.json(comments);
+    });
+}
+
+function putComment(req, res, next) {
+    var comment = req.body,
+        Comment = req.models.Comment;
+
+    comment.TaskId = req.params.id;
+    comment.ownerId = req.user.id;
+
+    var create = Comment.create(comment);
+
+    create.complete(function(err) {
+        if(err) {
+            return next(err);
+        }
+
+        res.json({});
+    });
+}
 
 function putNotifyTask(req, res, next) {
     // TODO: Move database logic into repository (DUPLICACAO)
@@ -76,15 +129,17 @@ function putNotifyTask(req, res, next) {
         var usersToBeNotified = [];
 
         function sendSms() {
-            usersToBeNotified.forEach(function(user) {
-                req.clickatexClient.send({
-                    to: '55' + user.telefone,
-                    text: 'SISGEST: Nova tarefa "' + gammautils.string.removeDiacritics(task.title).toUpperCase() + '" adicionada por ' + task.owner.name
-                }, function(err) {
-                    if(err) {
-                        console.log(err); // TODO: Log distribuido
-                    }
-                });
+            async.eachSeries(usersToBeNotified, function(user, cb) {
+                setTimeout(function() {
+                    req.clickatexClient.send({
+                        to: '55' + user.telefone,
+                        text: 'SISGEST: Nova tarefa "' + gammautils.string.removeDiacritics(task.title).toUpperCase() + '" em http://sisgest.bmsilva.com.br'
+                    }, function(err) {
+                        if(err) {
+                            console.log(err); // TODO: Log distribuido
+                        }
+                    });
+                }, 1000);
             });
         }
 
