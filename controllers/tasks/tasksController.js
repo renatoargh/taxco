@@ -73,24 +73,48 @@ function putNotifyTask(req, res, next) {
             return next(err);
         }
 
-        var usersToBeNotified = [].concat(task.visibleTo && task.visibleTo.filter(function(user) {
-            return user.telefone;
-        }));
+        var usersToBeNotified = [];
 
-        task.assignedTo && usersToBeNotified.push(task.assignedTo);
+        function sendSms() {
+            usersToBeNotified.forEach(function(user) {
+                req.clickatexClient.send({
+                    to: '55' + user.telefone,
+                    text: 'SISGEST: Nova tarefa "' + gammautils.string.removeDiacritics(task.title).toUpperCase() + '" adicionada por ' + task.owner.name
+                }, function(err) {
+                    if(err) {
+                        console.log(err); // TODO: Log distribuido
+                    }
+                });
+            });
+        }
 
-        usersToBeNotified.forEach(function(user) {
-            req.clickatexClient.send({
-                to: '55' + user.telefone,
-                text: 'SISGEST: Nova tarefa "' + gammautils.string.removeDiacritics(task.title).toUpperCase() + '" adicionada por ' + task.owner.name
-            }, function(err) {
-                if(err) {
-                    console.log(err); // TODO: Log distribuido
+        if(task.isPublic) {
+            var findAll = User.findAll({
+                where: {
+                    enabled: true
                 }
             });
-        });
 
-        res.end();
+            findAll.complete(function(err, users) {
+                if(err) {
+                    return next(err);
+                }
+
+                usersToBeNotified = usersToBeNotified.concat(users);
+                sendSms();
+            });
+        } else {
+            if(task.visibleTo) {
+                usersToBeNotified = usersToBeNotified.concat(task.visibleTo.filter(function(user) {
+                    return user.telefone;
+                }));
+            }
+
+            task.assignedTo && usersToBeNotified.push(task.assignedTo);
+
+            sendSms();
+            res.end();
+        }
     });
 }
 
