@@ -1,6 +1,6 @@
 {
   "name": "taxco",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Very simple task management api",
   "main": "index.js",
   "scripts": {

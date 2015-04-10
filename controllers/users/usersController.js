@@ -2,6 +2,7 @@
 
 var _ = require('underscore'),
     async = require('async'),
+    gammautils = require('gammautils'),
     bcrypt = require('bcrypt'),
     router = require('express').Router(),
     auth = require('../../middlewares/authenticationMiddleware'),
@@ -85,6 +86,7 @@ function putUser(req, res, next) {
 
 function getMe(req, res, next) {
     var user = req.user;
+    user.emailMd5 = gammautils.crypto.md5(user.email);
 
     if(user) {
         return res.json(_.omit(user, userPrivateAttributes));
