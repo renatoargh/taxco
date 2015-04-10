@@ -55,6 +55,15 @@ function findAll(where, options, callback) {
         order: [
             ['name', 'asc']
         ],
-        attributes: ['id', 'name', 'email', 'role', 'enabled', 'lastInteraction']
+        attributes: [
+            'id',
+            'name',
+            'email',
+            'telefone',
+            'role',
+            'enabled',
+            'lastInteraction',
+            'numberOfInteractions'
+        ]
     }).complete(callback);
 }

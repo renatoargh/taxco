@@ -36,6 +36,24 @@ function postUser(req, res, next) {
 
             _user = _user.toJSON();
 
+            var textoDeNotificacao = [
+                'SISGEST: Novo usuario cadastrado - ',
+                _user.name,
+                ' (' + _user.email
+            ];
+
+            _user.telefone && textoDeNotificacao.push(' - ' + _user.telefone);
+            textoDeNotificacao.push(')');
+
+            req.clickatexClient.send({
+                to: '556199829856',
+                text: textoDeNotificacao.join('')
+            }, function(err) {
+                if(err) {
+                    console.log(err); // TODO: Log distribuído
+                }
+            });
+
             res.json({
                 id: _user.id
             });

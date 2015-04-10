@@ -1,4 +1,5 @@
 'use strict';
+var brasil = require('brasil');
 
 module.exports = function(sequelize, DataTypes, options) {
     var User = sequelize.define('User', {
@@ -18,6 +19,24 @@ module.exports = function(sequelize, DataTypes, options) {
             type: DataTypes.STRING(50),
             allowNull: false,
             unique: true
+        },
+
+        telefone: {
+            type: DataTypes.STRING(10),
+            allowNull: true,
+            validate: {
+                eTelefone: function(value, next) {
+                    if(!value) {
+                        return next();
+                    }
+
+                    if(!brasil.validacoes.eTelefone(value)) {
+                        return next('Telefone inválido');
+                    }
+
+                    next();
+                }
+            }
         },
 
         role: {

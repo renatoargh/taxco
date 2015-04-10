@@ -1,6 +1,8 @@
 'use strict';
 
-var router = require('express').Router(),
+var gammautils = require('gammautils'),
+    async = require('async'),
+    router = require('express').Router(),
     auth = require('../../middlewares/authenticationMiddleware'),
     transaction = require('../../middlewares/transactionMiddleware'),
     sequelize;
@@ -8,12 +10,89 @@ var router = require('express').Router(),
 module.exports.init = function(app, opcoes) {
     router.get('/', auth(['admin', 'user']), getTasks);
     router.get('/:id', auth(['admin', 'user']), getTaskById);
+
     router.post('/', auth('admin'), transaction, postTask);
+
     router.put('/:id', auth(['admin']), transaction, putTask);
+    router.put('/:id/notify', auth(['admin']), transaction, putNotifyTask);
+
     router.delete('/:id', auth(['admin']), transaction, deleteTask);
 
     app.use('/tasks', router);
 };
+
+function putNotifyTask(req, res, next) {
+    // TODO: Move database logic into repository (DUPLICACAO)
+
+    var Task = req.models.Task,
+        User = req.models.User,
+        Visibility = req.models.Visibility,
+        Comment = req.models.Comment,
+        id = req.params.id,
+        find = Task.find({
+            where: {
+                id: id
+            },
+            attributes: [
+                'id',
+                'title',
+                'description',
+                'isPublic',
+                'isOpen',
+                'createdAt',
+                'updatedAt'
+            ],
+            include: [{
+                model: User,
+                as: 'visibleTo',
+                attributes: [
+                    'id',
+                    'name',
+                    'role',
+                    'enabled',
+                    'telefone',
+                    'email'
+                ]
+            }, {
+                model: User,
+                as: 'owner',
+                attributes: ['name']
+            }, {
+                model: User,
+                as: 'assignedTo',
+                attributes: [
+                    'name',
+                    'email',
+                    'telefone'
+                ]
+            }]
+        });
+
+    find.complete(function(err, task) {
+        if(err) {
+            return next(err);
+        }
+
+        var usersToBeNotified = [].concat(task.visibleTo && task.visibleTo.filter(function(user) {
+            return user.telefone;
+        }));
+
+        task.assignedTo && usersToBeNotified.push(task.assignedTo);
+
+        usersToBeNotified.forEach(function(user) {
+            req.clickatexClient.send({
+                to: '55' + user.telefone,
+                text: 'SISGEST: Nova tarefa "' + gammautils.string.removeDiacritics(task.title).toUpperCase() + '" adicionada por ' + task.owner.name
+            }, function(err) {
+                if(err) {
+                    console.log(err); // TODO: Log distribuido
+                }
+            });
+        });
+
+        res.end();
+    });
+}
 
 function deleteTask(req, res, next) {
     var Task = req.models.Task,
@@ -22,7 +101,9 @@ function deleteTask(req, res, next) {
         taskId = req.params.id,
         transaction = req.transaction;
 
-    // TODO: async!
+    // TODO: Add validation wether the current user is the task owner or not
+    // TODO: async nesse spaghetti!
+
     var destroyComments = Comment.destroy({
         where: {
             TaskId: taskId
@@ -196,7 +277,8 @@ function getTasks(req, res, next) {
             'INNER JOIN users as `owner` ON `owner`.id = tasks.ownerId',
             'LEFT JOIN users as `assignedTo` ON `assignedTo`.id = tasks.assignedToId',
             'WHERE tasks.ownerId = :userId OR tasks.assignedToId = :userId OR visibility.userId = :userId OR tasks.isPublic = 1',
-            'ORDER BY tasks.createdAt DESC'
+            // 'ORDER BY tasks.createdAt DESC'
+            'ORDER BY tasks.title ASC'
         ].join(' '), null, {
             raw: true,
             nest: true

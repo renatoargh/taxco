@@ -7,6 +7,7 @@ global._repository = global._repository = function(repository) {
 
 // Third party dependecies
 var express = require('express'),
+    clickatex = require('clickatex'),
     morgan = require('morgan'),
     bodyParser = require('body-parser'),
     methodOverride = require('method-override'),
@@ -27,6 +28,12 @@ var express = require('express'),
     env = require('./env.json'),
     UserRepository = _repository('user'),
     userRepository;
+
+var clickatexClient = new clickatex.Client({
+    apiId: env.clickatell.apiId,
+    user: env.clickatell.user,
+    password: env.clickatell.password
+});
 
 // Database initialization
 var sequelize = new Sequelize(env.mysql.database, env.mysql.user, env.mysql.password, {
@@ -160,9 +167,11 @@ app.use(function(req, res, next) {
             }
 
             if(match) {
-                user.update({
-                    lastInteraction: Date.now(),
-                    numberOfInteractions: sequelize.literal('numberOfInteractions + 1')
+                setImmediate(function() {
+                    user.update({
+                        lastInteraction: Date.now(),
+                        numberOfInteractions: sequelize.literal('numberOfInteractions + 1')
+                    });
                 });
 
                 req.user = user.toJSON();
@@ -191,6 +200,7 @@ app.use(function(req, res, next) {
     }
 
     req.fullPath = req.fullUrl + req.url.split('?')[0];
+    req.clickatexClient = clickatexClient;
 
     next();
 });
