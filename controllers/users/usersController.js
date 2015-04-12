@@ -23,6 +23,7 @@ module.exports.init = function(app, models) {
 
 function postUser(req, res, next) {
     var user = req.body,
+        sequelize = req.sequelize,
         salt = _.partial(bcrypt.genSalt, 2), // TODO: Trocar para 12 quando o mecanismo de login estiver similar ao GammaERP
         hash = _.partial(bcrypt.hash, user.password);
 
@@ -46,13 +47,24 @@ function postUser(req, res, next) {
             _user.telefone && textoDeNotificacao.push(' - ' + _user.telefone);
             textoDeNotificacao.push(')');
 
-            req.clickatexClient.send({
-                to: '556199829856',
-                text: textoDeNotificacao.join('')
-            }, function(err) {
+            userRepository.findAll({
+                role: 'admin',
+                telefone: sequelize.literal('telefone IS NOT NULL')
+            }, function(err, administrators) {
                 if(err) {
-                    console.log(err); // TODO: Log distribuído
+                    return console.log(err); // Log distribuido
                 }
+
+                administrators.forEach(function(admin) {
+                    req.clickatexClient.send({
+                        to: '55' + admin.telefone,
+                        text: textoDeNotificacao.join('')
+                    }, function(err) {
+                        if(err) {
+                            console.log(err); // TODO: Log distribuído
+                        }
+                    });
+                });
             });
 
             res.json({
