@@ -223,8 +223,9 @@ function putNotifyTask(req, res, next) {
             task.assignedTo && usersToBeNotified.push(task.assignedTo);
 
             sendSms();
-            res.end();
         }
+
+        res.end();
     });
 }
 
