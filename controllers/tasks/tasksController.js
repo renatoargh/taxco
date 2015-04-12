@@ -1,6 +1,7 @@
 'use strict';
 
 var gammautils = require('gammautils'),
+    HttpClientError = gammautils.error.HttpClientError,
     async = require('async'),
     router = require('express').Router(),
     auth = require('../../middlewares/authenticationMiddleware'),
@@ -11,17 +12,71 @@ module.exports.init = function(app, opcoes) {
     router.get('/', auth(['admin', 'user']), getTasks);
     router.get('/:id', auth(['admin', 'user']), getTaskById);
     router.get('/:id/comments', transaction, getCommentsByTaskId);
+    router.get('/:id/visibility', transaction, getVisibilityByTaskId);
 
     router.post('/', auth('admin'), transaction, postTask);
 
     router.put('/:id', auth(['admin']), transaction, putTask);
     router.put('/:id/notify', auth(['admin']), transaction, putNotifyTask);
     router.put('/:id/comments', transaction, putComment);
+    router.put('/:id/mark-visualized', transaction, putMarkVisualized);
 
     router.delete('/:id', auth(['admin']), transaction, deleteTask);
 
     app.use('/tasks', router);
 };
+
+function putMarkVisualized(req, res, next) {
+    var Visibility = req.models.Visibility,
+        sequelize = req.sequelize,
+        user = req.user;
+
+    var update = Visibility.update({
+        numberOfVisualizations: sequelize.literal('numberOfVisualizations + 1'),
+        visualizedAt: sequelize.literal('CASE WHEN visualizedAt IS NULL THEN NOW() ELSE visualizedAt END')
+    }, {
+        where: {
+            userId: user.id,
+            taskId: req.params.id
+        }
+    });
+
+    update.complete(function(err) {
+        if(err) {
+            return next(err);
+        }
+
+        res.json({});
+    });
+}
+
+function getVisibilityByTaskId(req, res, next) {
+    var User = req.models.User,
+        Visibility = req.models.Visibility,
+        Comment = req.models.Comment;
+
+    var findAll = Visibility.findAll({
+        where: {
+            taskId: req.params.id
+        },
+        include: [{
+            model: User,
+            as: 'user',
+            attributes: [
+                'name',
+                'email'
+            ]
+        }]
+    });
+
+    findAll.complete(function(err, visibilities) {
+        if(err) {
+            return next(err);
+        }
+
+        res.json(visibilities);
+    });
+}
 
 function getCommentsByTaskId(req, res, next) {
     var User = req.models.User,
@@ -428,6 +483,10 @@ function getTaskById(req, res, next) {
     find.complete(function(err, task) {
         if(err) {
             return next(err);
+        }
+
+        if(!task) {
+            return next(HttpClientError('', 404));
         }
 
         res.json(task);

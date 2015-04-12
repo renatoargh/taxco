@@ -2,25 +2,38 @@
 
 module.exports = function(sequelize, DataTypes, options) {
     var Visibility = sequelize.define('Visibility', {
-        // taskId: {
-        //     primaryKey: true,
-        //     type: DataTypes.INTEGER,
-        //     allowNull: false,
-        //     references: 'tasks',
-        //     referencesKey: 'id'
-        // },
+        numberOfVisualizations: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+        },
 
-        // userId: {
-        //     primaryKey: true,
-        //     type: DataTypes.INTEGER,
-        //     allowNull: false,
-        //     references: 'users',
-        //     referencesKey: 'id'
-        // }
+        visualizedAt: {
+            type: DataTypes.DATE,
+            allowNull: true
+        },
+
+        smsSentAt: {
+            type: DataTypes.DATE,
+            allowNull: true
+        },
+
+        emailSentAt: {
+            type: DataTypes.DATE,
+            allowNull: true
+        },
     },{
         freezeTableName: true,
         timestamps: false,
-        tableName: 'visibility'
+        tableName: 'visibility',
+        classMethods: {
+            associate: function(models) {
+                Visibility.belongsTo(models.User, {
+                    as: 'user',
+                    foreignKey: 'userId'
+                });
+            }
+        }
     });
 
     return Visibility;
