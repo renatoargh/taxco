@@ -19,6 +19,7 @@ var express = require('express'),
 
     // Node.js native dependencies
     fs = require('fs'),
+    http = require('http'),
     path = require('path'),
 
     // Var initializations
@@ -37,6 +38,8 @@ var clickatexClient = new clickatex.Client({
     countryCode: '55'
 });
 
+http.globalAgent.maxSockets = Infinity;
+
 var sequelize = new Sequelize(env.mysql.database, env.mysql.user, env.mysql.password, {
         host: env.mysql.host,
         port: env.mysql.port,
@@ -47,7 +50,9 @@ var sequelize = new Sequelize(env.mysql.database, env.mysql.user, env.mysql.pass
             collation: 'utf8_general_ci'
         },
         pool: {
-            maxConnections: 10
+            minConnections: 0,
+            maxConnections: 10,
+            maxIdleTime: 10
         }
     }),
     modelsFolder = path.join(__dirname, '/domain/models'),
@@ -63,8 +68,6 @@ Object.keys(models).forEach(function(modelName) {
         models[modelName].associate(models);
     }
 });
-
-userRepository = new UserRepository(models);
 
 var app = express();
 
@@ -106,6 +109,7 @@ app.use(function(req, res, next) {
         password: credentials[1]
     };
 
+    userRepository = new UserRepository(models);
     userRepository.find({
         email: credentials.email,
         enabled: true

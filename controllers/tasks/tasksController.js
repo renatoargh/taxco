@@ -11,13 +11,13 @@ var gammautils = require('gammautils'),
 module.exports.init = function(app, opcoes) {
     router.get('/', auth(['admin', 'user']), getTasks);
     router.get('/:id', auth(['admin', 'user']), getTaskById);
-    router.get('/:id/comments', transaction, getCommentsByTaskId);
-    router.get('/:id/visibility', transaction, getVisibilityByTaskId);
+    router.get('/:id/comments', getCommentsByTaskId);
+    router.get('/:id/visibility', getVisibilityByTaskId);
 
     router.post('/', auth('admin'), transaction, postTask);
 
     router.put('/:id', auth(['admin']), transaction, putTask);
-    router.put('/:id/notify', auth(['admin']), transaction, putNotifyTask);
+    router.put('/:id/notify', auth(['admin']), putNotifyTask);
     router.put('/:id/comments', transaction, putComment);
     router.put('/:id/mark-visualized', transaction, putMarkVisualized);
 
@@ -46,6 +46,7 @@ function putMarkVisualized(req, res, next) {
             return next(err);
         }
 
+        req.transaction.commit();
         res.json({});
     });
 }
@@ -125,6 +126,7 @@ function putComment(req, res, next) {
             return next(err);
         }
 
+        req.transaction.commit();
         res.json({});
     });
 }
