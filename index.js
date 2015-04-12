@@ -32,10 +32,11 @@ var express = require('express'),
 var clickatexClient = new clickatex.Client({
     apiId: env.clickatell.apiId,
     user: env.clickatell.user,
-    password: env.clickatell.password
+    password: env.clickatell.password,
+    prefix: 'SISGEST: ',
+    countryCode: '55'
 });
 
-// Database initialization
 var sequelize = new Sequelize(env.mysql.database, env.mysql.user, env.mysql.password, {
         host: env.mysql.host,
         port: env.mysql.port,
@@ -44,9 +45,6 @@ var sequelize = new Sequelize(env.mysql.database, env.mysql.user, env.mysql.pass
         define: {
             charset: 'utf8',
             collation: 'utf8_general_ci'
-        },
-        dialectOptions: {
-            multipleStatements: !isProduction
         },
         pool: {
             maxConnections: 10
@@ -68,64 +66,24 @@ Object.keys(models).forEach(function(modelName) {
 
 userRepository = new UserRepository(models);
 
-function dropDatabase(callback) {
-    var dropAllTables = [
-            'SET FOREIGN_KEY_CHECKS = 0;',
-            'SET GROUP_CONCAT_MAX_LEN = 32768;',
-            'SET @tables = NULL;',
-            "SELECT GROUP_CONCAT('`', table_name, '`') INTO @tables FROM information_schema.tables WHERE table_schema = (SELECT DATABASE());",
-            "SET @tables = CONCAT('DROP TABLE IF EXISTS ', @tables);",
-            "SELECT IFNULL(@tables, 'SELECT 1') INTO @tables;",
-            'PREPARE stmt FROM @tables;',
-            'EXECUTE stmt;',
-            'DEALLOCATE PREPARE stmt;',
-            'SET FOREIGN_KEY_CHECKS = 1;',
-            "SET GLOBAL sql_mode = 'STRICT_ALL_TABLES';"
-        ].join(' ');
-
-    sequelize
-        .query(dropAllTables)
-        .then(function() {
-            return sequelize.sync({ logging: console.log, force: true }); //TODO: Implementar log distribuido
-        })
-        // .then(function() {
-        //     return sequelize.query([
-
-        //     ].join(';'));
-        // })
-        .then(function() {
-            console.log('Database recreated!');
-            callback();
-        }, function(err) {
-            console.log('Error while recreating database:'); //TODO: Implementar log distribuido
-            throw err;
-        });
-}
-
-// Http server initialization
 var app = express();
 
 if(!isProduction) {
-    // Logging middleware used only in development
     app.use(morgan('dev'));
 }
 
 app.enable('trust proxy');
 
 app.use(function(req, res, next) {
-    // CORS Middleware
     res.header('Access-Control-Allow-Origin', '*');
-
     res.header('Access-Control-Allow-Methods', [
         'GET', 'PUT' , 'POST',
         'DELETE', 'HEAD', 'OPTIONS'
     ].join(','));
-
     res.header('Access-Control-Allow-Headers', [
         'Content-Type', 'Authorization',
         'Content-Length', 'X-Requested-With'
     ].join(','));
-
     res.header('Access-Control-Expose-Headers', '');
 
     if ('OPTIONS' === req.method) {
@@ -137,8 +95,7 @@ app.use(function(req, res, next) {
 
 app.use(function(req, res, next) {
     if(!req.headers.authorization) {
-        // Forwards as anonymous request
-        return next();
+        return next(); // Forwards as anonymous request
     }
 
     var credentials = req.headers.authorization.replace('Basic ', '');
@@ -166,14 +123,15 @@ app.use(function(req, res, next) {
                 return done(err);
             }
 
-            if(match) {
-                setImmediate(function() {
-                    user.update({
-                        lastInteraction: Date.now(),
-                        numberOfInteractions: sequelize.literal('numberOfInteractions + 1')
-                    });
+            function recordLastInteraction() {
+                user.update({
+                    lastInteraction: Date.now(),
+                    numberOfInteractions: sequelize.literal('numberOfInteractions + 1')
                 });
+            }
 
+            if(match) {
+                setImmediate(recordLastInteraction);
                 req.user = user.toJSON();
                 return next();
             }
@@ -195,6 +153,7 @@ app.use(function(req, res, next) {
     req.sequelize = sequelize;
     req.models = models;
     req.fullUrl = req.protocol + '://' + req.hostname;
+
     if(NODE_ENV === 'development') {
         req.fullUrl += ':' + PORT;
     }
@@ -205,7 +164,6 @@ app.use(function(req, res, next) {
     next();
 });
 
-// Initializing controllers
 glob.sync(__dirname + '/controllers/**/*Controller.js').forEach(function(controllerPath) {
     require(controllerPath).init(app, models);
 });
@@ -216,7 +174,6 @@ app.use(function(req, res){
     });
 });
 
-// Generic error middleware
 app.use(function(err, req, res, next) {
     if(req.transaction) {
         req.transaction.rollback();
@@ -242,25 +199,9 @@ app.use(function(err, req, res, next) {
     }
 });
 
-if(process.argv[2] && process.argv[2].toLowerCase() === 'sync') {
-    if(isProduction) {
-        var message = [
-            'Database can only be recreated in development mode (NODE_ENV=development)',
-        ];
-
-        throw new Error(message.join(' '));
-    }
-
-    dropDatabase(startServer);
-} else {
-    startServer();
-}
-
-function startServer() {
-    app.listen(PORT, function() {
-        console.log('taxco running on port ' + PORT);
-    });
-};
+app.listen(PORT, function() {
+    console.log('taxco running on port ' + PORT);
+});
 
 process.on('uncaughtException', function (e) {
     console.log('uncaughtException, process exiting now...');
