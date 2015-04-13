@@ -29,6 +29,12 @@ module.exports = function(sequelize, DataTypes, options) {
             type: DataTypes.BOOLEAN,
             allowNull: false,
             defaultValue: true
+        },
+
+        reviewRequest: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false
         }
     },{
         freezeTableName: true,

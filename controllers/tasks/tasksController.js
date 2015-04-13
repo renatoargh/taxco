@@ -6,9 +6,12 @@ var gammautils = require('gammautils'),
     router = require('express').Router(),
     auth = require('../../middlewares/authenticationMiddleware'),
     transaction = require('../../middlewares/transactionMiddleware'),
-    sequelize;
+    UserReposiroty = _repository('user'),
+    userReposiroty, sequelize;
 
-module.exports.init = function(app, opcoes) {
+module.exports.init = function(app, models) {
+    userReposiroty = new UserReposiroty(models);
+
     router.get('/', auth(['admin', 'user']), getTasks);
     router.get('/:id', auth(['admin', 'user']), getTaskById);
     router.get('/:id/comments', getCommentsByTaskId);
@@ -20,11 +23,71 @@ module.exports.init = function(app, opcoes) {
     router.put('/:id/notify', auth(['admin']), putNotifyTask);
     router.put('/:id/comments', transaction, putComment);
     router.put('/:id/mark-visualized', transaction, putMarkVisualized);
+    router.put('/:id/request-review', putRequestReview);
 
     router.delete('/:id', auth(['admin']), transaction, deleteTask);
 
     app.use('/tasks', router);
 };
+
+function putRequestReview(req, res, next) {
+    var user = req.user,
+        taskId = req.params.id,
+        User = req.models.User,
+        Task = req.models.Task;
+
+    var update = Task.update({
+        reviewRequest: true
+    }, {
+        where: {
+            id: taskId,
+            assignedToId: user.id,
+            reviewRequest: false
+        }
+    });
+
+    update.complete(function(err, linesChanged) {
+        if(err) {
+            return next(err);
+        }
+
+        if(linesChanged === 0) {
+            return next(new HttpClientError('', 404));
+        }
+
+        Task.find({
+            where: {
+                id: taskId
+            },
+            include: [{
+                model: User,
+                as: 'owner',
+                attributes: [
+                    'name',
+                    'telefone',
+                    'email'
+                ]
+            }]
+        }).complete(function(err, task) {
+            if(err) {
+                return next(err);
+            }
+
+            if(task.owner.telefone) {
+                req.clickatexClient.send({
+                    to: '55' + task.owner.telefone,
+                    text: 'SISGEST: Revisao solicitada para a tarefa "' + gammautils.string.removeDiacritics(task.title).toUpperCase() + '".'
+                }, function(err) {
+                    if(err) {
+                        console.log(err); // TODO: Log distribuido
+                    }
+                });
+            }
+        });
+
+        res.json({});
+    });
+}
 
 function putMarkVisualized(req, res, next) {
     var Visibility = req.models.Visibility,
@@ -292,12 +355,15 @@ function putTask(req, res, next) {
         currentUser = req.user,
         visibleTo = task.visibleToId || [];
 
+    task.isOpen = task.isOpen.toString() === 'true';
     task.isPublic = visibleTo.indexOf('ALL') > -1;
     if(task.isPublic) {
         visibleTo = [];
     }
 
-    task.assignedToId = task.assignedToId ? parseInt(task.assignedToId, 10) : null;
+    if(!task.isOpen) {
+        task.reviewRequest = false;
+    }
 
     Task.update(task, {
         where: {
@@ -308,6 +374,10 @@ function putTask(req, res, next) {
     }).complete(function(err, rows) {
         if(err) {
             return next(err);
+        }
+
+        if(rows === 0) {
+            return next(new HttpClientError('', 404));
         }
 
         Visibility.destroy({
