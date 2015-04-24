@@ -355,8 +355,11 @@ function putTask(req, res, next) {
         currentUser = req.user,
         visibleTo = task.visibleToId || [];
 
+    task.type = task.type && task.type.toLowerCase();
     task.isOpen = task.isOpen.toString() === 'true';
     task.isPublic = visibleTo.indexOf('ALL') > -1;
+    task.assignedToId = task.assignedToId || null;
+
     if(task.isPublic) {
         visibleTo = [];
     }
@@ -473,6 +476,9 @@ function postTask(req, res, next) {
 
 function getTasks(req, res, next) {
     var currentUser = req.user,
+        types = (req.query.types || ['task', 'knowledgebase']).map(function(type) {
+            return "'" + type + "'";
+        }),
         query = req.sequelize.query([
             'SELECT DISTINCT tasks.*, ',
             '`owner`.`name` as `owner.name`, ',
@@ -483,7 +489,8 @@ function getTasks(req, res, next) {
             'LEFT JOIN visibility as `visibility` ON visibility.taskId = tasks.id',
             'INNER JOIN users as `owner` ON `owner`.id = tasks.ownerId',
             'LEFT JOIN users as `assignedTo` ON `assignedTo`.id = tasks.assignedToId',
-            'WHERE tasks.ownerId = :userId OR tasks.assignedToId = :userId OR visibility.userId = :userId OR tasks.isPublic = 1',
+            'WHERE (tasks.ownerId = :userId OR tasks.assignedToId = :userId OR visibility.userId = :userId OR tasks.isPublic = 1)',
+            ' AND tasks.type IN (' + types + ')',
             // 'ORDER BY tasks.createdAt DESC'
             'ORDER BY tasks.title ASC'
         ].join(' '), null, {

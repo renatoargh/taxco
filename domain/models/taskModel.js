@@ -19,6 +19,11 @@ module.exports = function(sequelize, DataTypes, options) {
             allowNull: false
         },
 
+        type: {
+            type: DataTypes.ENUM('task', 'knowledgebase'),
+            allowNull: false
+        },
+
         isPublic: {
             type: DataTypes.BOOLEAN,
             allowNull: false,
